@@ -14,6 +14,8 @@
     th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
     th { background-color: #007bff; color: white; }
     tfoot td { font-weight: bold; background: #f0f0f0; }
+    .delete-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; cursor: pointer; }
+    .delete-btn:hover { background: #a71d2a; }
   </style>
 </head>
 <body>
@@ -38,12 +40,13 @@
         <th>Workers</th>
         <th>Wage (₹)</th>
         <th>Total Charge (₹)</th>
+        <th>Action</th>
       </tr>
     </thead>
     <tbody id="logBody"></tbody>
     <tfoot>
       <tr>
-        <td colspan="3">Grand Total</td>
+        <td colspan="4">Grand Total</td>
         <td id="grandTotal">0</td>
       </tr>
     </tfoot>
@@ -70,18 +73,27 @@
       renderLog();
     }
 
+    function deleteRecord(index) {
+      if (confirm("Are you sure you want to delete this entry?")) {
+        records.splice(index, 1);
+        saveRecords();
+        renderLog();
+      }
+    }
+
     function renderLog() {
       const body = document.getElementById("logBody");
       const grandTotalCell = document.getElementById("grandTotal");
       body.innerHTML = "";
       let grandTotal = 0;
 
-      records.forEach(r => {
+      records.forEach((r, index) => {
         const row = `<tr>
           <td>${r.date}</td>
           <td>${r.count}</td>
           <td>${r.wage}</td>
           <td>${r.total}</td>
+          <td><button class="delete-btn" onclick="deleteRecord(${index})">Delete</button></td>
         </tr>`;
         body.innerHTML += row;
         grandTotal += r.total;
@@ -97,7 +109,7 @@
         csv += `${r.date},${r.count},${r.wage},${r.total}\n`;
         grandTotal += r.total;
       });
-      csv += `,,Grand Total,${grandTotal}\n`;
+      csv += `,,,Grand Total,${grandTotal}\n`;
 
       const blob = new Blob([csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
