@@ -1,33 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Attendance & Labour Tracker</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Attendance & Labour Charge Tracker</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 20px; }
-    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 8px; }
-    th { background: #f2f2f2; }
-    button { margin: 5px; }
+    h2 { margin-top: 20px; }
+    input, button { margin: 5px; padding: 5px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    th { background-color: #f2f2f2; }
+    button { cursor: pointer; }
   </style>
 </head>
 <body>
   <h2>Attendance & Labour Charge Tracker</h2>
 
   <label for="date">Select Date:</label>
-  <input type="date" id="date" value="">
-  <br><br>
+  <input type="date" id="date"><br>
 
   <label for="wage">Daily Wage (₹):</label>
-  <input type="number" id="wage" value="500">
-  <br><br>
+  <input type="number" id="wage" value="900"><br>
 
-  <input type="text" id="studentName" placeholder="Enter name">
-  <button onclick="addStudent()">Add Worker</button>
+  <input type="text" id="workerName" placeholder="Enter name">
+  <button onclick="addWorker()">Add Worker</button>
 
   <h3>Mark Attendance</h3>
-  <div id="studentList"></div>
+  <div id="workers"></div>
 
   <h3>Attendance Log</h3>
-  <table id="attendanceTable">
+  <table id="logTable">
     <tr>
       <th>Date</th>
       <th>Name</th>
@@ -36,20 +39,52 @@
     </tr>
   </table>
 
-  <br>
   <button onclick="downloadCSV()">Download CSV</button>
+  <button onclick="clearData()">Clear All Data</button>
 
   <script>
-    // Default today's date
-    document.getElementById("date").value = new Date().toISOString().split("T")[0];
+    let workers = ["Deepak"];
+    let attendanceLog = JSON.parse(localStorage.getItem("attendanceLog")) || [];
 
-    // Load attendance log from localStorage
-    let attendanceData = JSON.parse(localStorage.getItem("attendance")) || [];
+    function saveLog() {
+      localStorage.setItem("attendanceLog", JSON.stringify(attendanceLog));
+    }
 
-    // Display saved data
-    function loadAttendance() {
-      let table = document.getElementById("attendanceTable");
-      // Reset table with header
+    function addWorker() {
+      const name = document.getElementById("workerName").value.trim();
+      if (name && !workers.includes(name)) {
+        workers.push(name);
+        document.getElementById("workerName").value = "";
+        renderWorkers();
+      }
+    }
+
+    function renderWorkers() {
+      const container = document.getElementById("workers");
+      container.innerHTML = "";
+      workers.forEach(name => {
+        const div = document.createElement("div");
+        div.innerHTML = `
+          ${name} 
+          <button onclick="markAttendance('${name}', 'Present')">Present</button>
+          <button onclick="markAttendance('${name}', 'Absent')">Absent</button>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function markAttendance(name, status) {
+      const date = document.getElementById("date").value || new Date().toISOString().split("T")[0];
+      const wage = parseInt(document.getElementById("wage").value) || 0;
+      const charge = status === "Present" ? wage : 0;
+
+      attendanceLog.push({ date, name, status, charge });
+      saveLog();
+      renderLog();
+    }
+
+    function renderLog() {
+      const table = document.getElementById("logTable");
       table.innerHTML = `
         <tr>
           <th>Date</th>
@@ -58,64 +93,41 @@
           <th>Charge (₹)</th>
         </tr>
       `;
-      attendanceData.forEach(entry => {
-        let row = table.insertRow();
-        row.insertCell(0).innerHTML = entry.date;
-        row.insertCell(1).innerHTML = entry.name;
-        row.insertCell(2).innerHTML = entry.status;
-        row.insertCell(3).innerHTML = entry.charge;
+      attendanceLog.forEach(entry => {
+        const row = `<tr>
+          <td>${entry.date}</td>
+          <td>${entry.name}</td>
+          <td>${entry.status}</td>
+          <td>${entry.charge}</td>
+        </tr>`;
+        table.innerHTML += row;
       });
     }
 
-    function addStudent() {
-      let name = document.getElementById("studentName").value.trim();
-      if (name === "") return;
-
-      let list = document.getElementById("studentList");
-      let div = document.createElement("div");
-      div.innerHTML = `
-        ${name} 
-        <button onclick="markAttendance('${name}', 'Present')">Present</button>
-        <button onclick="markAttendance('${name}', 'Absent')">Absent</button>
-      `;
-      list.appendChild(div);
-      document.getElementById("studentName").value = "";
-    }
-
-    function markAttendance(name, status) {
-      let date = document.getElementById("date").value;
-      let wage = parseFloat(document.getElementById("wage").value) || 0;
-      let charge = (status === "Present") ? wage : 0;
-
-      let entry = { date: date, name: name, status: status, charge: charge };
-
-      attendanceData.push(entry);
-      localStorage.setItem("attendance", JSON.stringify(attendanceData));
-
-      loadAttendance();
-    }
-
-    // Download as CSV
     function downloadCSV() {
       let csv = "Date,Name,Status,Charge (₹)\n";
-      attendanceData.forEach(entry => {
-        csv += `${entry.date},${entry.name},${entry.status},${entry.charge}\n`;
+      attendanceLog.forEach(row => {
+        csv += `${row.date},${row.name},${row.status},${row.charge}\n`;
       });
-
-      let blob = new Blob([csv], { type: "text/csv" });
-      let url = window.URL.createObjectURL(blob);
-
-      let a = document.createElement("a");
-      a.setAttribute("hidden", "");
-      a.setAttribute("href", url);
-      a.setAttribute("download", "attendance.csv");
-      document.body.appendChild(a);
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "attendance.csv";
       a.click();
-      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     }
 
-    // Initial load
-    loadAttendance();
+    function clearData() {
+      if (confirm("Are you sure you want to delete all records?")) {
+        attendanceLog = [];
+        saveLog();
+        renderLog();
+      }
+    }
+
+    renderWorkers();
+    renderLog();
   </script>
 </body>
 </html>
