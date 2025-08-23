@@ -13,6 +13,7 @@
     table { border-collapse: collapse; width: 100%; margin-top: 20px; }
     th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
     th { background-color: #007bff; color: white; }
+    tfoot td { font-weight: bold; background: #f0f0f0; }
   </style>
 </head>
 <body>
@@ -31,12 +32,21 @@
 
   <h3>Daily Records</h3>
   <table id="logTable">
-    <tr>
-      <th>Date</th>
-      <th>Workers</th>
-      <th>Wage (₹)</th>
-      <th>Total Charge (₹)</th>
-    </tr>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Workers</th>
+        <th>Wage (₹)</th>
+        <th>Total Charge (₹)</th>
+      </tr>
+    </thead>
+    <tbody id="logBody"></tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Grand Total</td>
+        <td id="grandTotal">0</td>
+      </tr>
+    </tfoot>
   </table>
 
   <button onclick="downloadCSV()">Download CSV</button>
@@ -61,15 +71,11 @@
     }
 
     function renderLog() {
-      const table = document.getElementById("logTable");
-      table.innerHTML = `
-        <tr>
-          <th>Date</th>
-          <th>Workers</th>
-          <th>Wage (₹)</th>
-          <th>Total Charge (₹)</th>
-        </tr>
-      `;
+      const body = document.getElementById("logBody");
+      const grandTotalCell = document.getElementById("grandTotal");
+      body.innerHTML = "";
+      let grandTotal = 0;
+
       records.forEach(r => {
         const row = `<tr>
           <td>${r.date}</td>
@@ -77,15 +83,22 @@
           <td>${r.wage}</td>
           <td>${r.total}</td>
         </tr>`;
-        table.innerHTML += row;
+        body.innerHTML += row;
+        grandTotal += r.total;
       });
+
+      grandTotalCell.textContent = grandTotal;
     }
 
     function downloadCSV() {
       let csv = "Date,Workers,Wage (₹),Total Charge (₹)\n";
+      let grandTotal = 0;
       records.forEach(r => {
         csv += `${r.date},${r.count},${r.wage},${r.total}\n`;
+        grandTotal += r.total;
       });
+      csv += `,,Grand Total,${grandTotal}\n`;
+
       const blob = new Blob([csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
