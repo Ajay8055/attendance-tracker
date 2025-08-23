@@ -1,127 +1,121 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Attendance & Labour Charges</title>
+  <title>Attendance & Labour Tracker</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 20px;
-      background: #f4f4f9;
-    }
-    h1 {
-      text-align: center;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 20px 0;
-      background: #fff;
-    }
-    th, td {
-      border: 1px solid #ccc;
-      padding: 8px;
-      text-align: center;
-    }
-    th {
-      background: #333;
-      color: white;
-    }
-    input {
-      padding: 6px;
-      margin: 5px 0;
-    }
-    button {
-      padding: 8px 12px;
-      margin: 5px;
-      background: #007bff;
-      border: none;
-      color: white;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0056b3;
-    }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table, th, td { border: 1px solid black; border-collapse: collapse; padding: 8px; }
+    th { background: #f2f2f2; }
+    button { margin: 5px; }
   </style>
 </head>
 <body>
-  <h1>Attendance & Labour Charge Tracker</h1>
+  <h2>Attendance & Labour Charge Tracker</h2>
 
-  <h3>Add Worker</h3>
-  <input type="text" id="name" placeholder="Worker Name">
-  <input type="number" id="rate" placeholder="Daily Wage (₹)">
-  <button onclick="addWorker()">Add Worker</button>
+  <label for="date">Select Date:</label>
+  <input type="date" id="date" value="">
+  <br><br>
 
+  <label for="wage">Daily Wage (₹):</label>
+  <input type="number" id="wage" value="500">
+  <br><br>
+
+  <input type="text" id="studentName" placeholder="Enter name">
+  <button onclick="addStudent()">Add Worker</button>
+
+  <h3>Mark Attendance</h3>
+  <div id="studentList"></div>
+
+  <h3>Attendance Log</h3>
   <table id="attendanceTable">
-    <thead>
-      <tr>
-        <th>Worker</th>
-        <th>Days Present</th>
-        <th>Daily Wage (₹)</th>
-        <th>Total Pay (₹)</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
+    <tr>
+      <th>Date</th>
+      <th>Name</th>
+      <th>Status</th>
+      <th>Charge (₹)</th>
+    </tr>
   </table>
 
-  <h2>Total Labour Cost: ₹<span id="totalCost">0</span></h2>
+  <br>
+  <button onclick="downloadCSV()">Download CSV</button>
 
   <script>
-    let workers = [];
+    // Default today's date
+    document.getElementById("date").value = new Date().toISOString().split("T")[0];
 
-    function addWorker() {
-      const name = document.getElementById("name").value;
-      const rate = parseFloat(document.getElementById("rate").value);
+    // Load attendance log from localStorage
+    let attendanceData = JSON.parse(localStorage.getItem("attendance")) || [];
 
-      if (!name || !rate) {
-        alert("Enter name and daily wage!");
-        return;
-      }
-
-      workers.push({ name, rate, days: 0 });
-      document.getElementById("name").value = "";
-      document.getElementById("rate").value = "";
-      renderTable();
+    // Display saved data
+    function loadAttendance() {
+      let table = document.getElementById("attendanceTable");
+      // Reset table with header
+      table.innerHTML = `
+        <tr>
+          <th>Date</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Charge (₹)</th>
+        </tr>
+      `;
+      attendanceData.forEach(entry => {
+        let row = table.insertRow();
+        row.insertCell(0).innerHTML = entry.date;
+        row.insertCell(1).innerHTML = entry.name;
+        row.insertCell(2).innerHTML = entry.status;
+        row.insertCell(3).innerHTML = entry.charge;
+      });
     }
 
-    function markPresent(index) {
-      workers[index].days++;
-      renderTable();
+    function addStudent() {
+      let name = document.getElementById("studentName").value.trim();
+      if (name === "") return;
+
+      let list = document.getElementById("studentList");
+      let div = document.createElement("div");
+      div.innerHTML = `
+        ${name} 
+        <button onclick="markAttendance('${name}', 'Present')">Present</button>
+        <button onclick="markAttendance('${name}', 'Absent')">Absent</button>
+      `;
+      list.appendChild(div);
+      document.getElementById("studentName").value = "";
     }
 
-    function resetDays(index) {
-      workers[index].days = 0;
-      renderTable();
+    function markAttendance(name, status) {
+      let date = document.getElementById("date").value;
+      let wage = parseFloat(document.getElementById("wage").value) || 0;
+      let charge = (status === "Present") ? wage : 0;
+
+      let entry = { date: date, name: name, status: status, charge: charge };
+
+      attendanceData.push(entry);
+      localStorage.setItem("attendance", JSON.stringify(attendanceData));
+
+      loadAttendance();
     }
 
-    function renderTable() {
-      const tbody = document.querySelector("#attendanceTable tbody");
-      tbody.innerHTML = "";
-      let totalCost = 0;
-
-      workers.forEach((worker, i) => {
-        const pay = worker.days * worker.rate;
-        totalCost += pay;
-
-        const row = `
-          <tr>
-            <td>${worker.name}</td>
-            <td>${worker.days}</td>
-            <td>₹${worker.rate}</td>
-            <td>₹${pay}</td>
-            <td>
-              <button onclick="markPresent(${i})">+ Present</button>
-              <button onclick="resetDays(${i})">Reset</button>
-            </td>
-          </tr>
-        `;
-        tbody.innerHTML += row;
+    // Download as CSV
+    function downloadCSV() {
+      let csv = "Date,Name,Status,Charge (₹)\n";
+      attendanceData.forEach(entry => {
+        csv += `${entry.date},${entry.name},${entry.status},${entry.charge}\n`;
       });
 
-      document.getElementById("totalCost").innerText = totalCost;
+      let blob = new Blob([csv], { type: "text/csv" });
+      let url = window.URL.createObjectURL(blob);
+
+      let a = document.createElement("a");
+      a.setAttribute("hidden", "");
+      a.setAttribute("href", url);
+      a.setAttribute("download", "attendance.csv");
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
+
+    // Initial load
+    loadAttendance();
   </script>
 </body>
 </html>
