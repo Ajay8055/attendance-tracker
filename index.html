@@ -14,28 +14,24 @@
     th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
     th { background-color: #007bff; color: white; }
     tfoot td { font-weight: bold; background: #f0f0f0; }
-    .delete-btn { background: #dc3545; }
+    .delete-btn { background: #dc3545; color: white; border: none; border-radius: 4px; padding: 5px 8px; cursor: pointer; }
     .delete-btn:hover { background: #a71d2a; }
-    .edit-btn { background: #28a745; }
-    .edit-btn:hover { background: #1e7e34; }
-    .tab-buttons { display: flex; margin-bottom: 20px; }
-    .tab-buttons button { flex: 1; border-radius: 0; }
-    .tab-buttons button.active { background: #0056b3; }
+    .edit-btn { background: #ffc107; color: black; border: none; border-radius: 4px; padding: 5px 8px; cursor: pointer; }
+    .edit-btn:hover { background: #e0a800; }
+    .tab-btn { width: 48%; display: inline-block; margin: 5px 1%; }
     .tab-content { display: none; }
     .tab-content.active { display: block; }
   </style>
 </head>
 <body>
-  <h2>Daily Tracker</h2>
+  <h2>Daily Labour & Expense Tracker</h2>
 
-  <!-- Tabs -->
-  <div class="tab-buttons">
-    <button id="labourTabBtn" class="active" onclick="switchTab('labour')">Labour Charges</button>
-    <button id="expenseTabBtn" onclick="switchTab('expense')">Expense Logs</button>
-  </div>
+  <!-- Tab Buttons -->
+  <button id="labourTabBtn" class="tab-btn" onclick="switchTab('labour')">Labour Logs</button>
+  <button id="expenseTabBtn" class="tab-btn" onclick="switchTab('expense')">Expense Logs</button>
 
-  <!-- Labour Charges Tab -->
-  <div id="labourTab" class="tab-content active">
+  <!-- Labour Tab -->
+  <div id="labourTab" class="tab-content">
     <label for="date">Select Date:</label>
     <input type="date" id="date"><br>
 
@@ -61,14 +57,18 @@
       <tbody id="logBody"></tbody>
       <tfoot>
         <tr>
-          <td colspan="4">Grand Total</td>
+          <td colspan="3">Grand Total</td>
           <td id="grandTotal">0</td>
+          <td></td>
         </tr>
       </tfoot>
     </table>
+
+    <button onclick="downloadCSV()">Download Labour CSV</button>
+    <button onclick="clearData()">Clear All Labour Data</button>
   </div>
 
-  <!-- Expense Logs Tab -->
+  <!-- Expense Tab -->
   <div id="expenseTab" class="tab-content">
     <label for="expenseDate">Select Date:</label>
     <input type="date" id="expenseDate"><br>
@@ -100,31 +100,65 @@
         </tr>
       </tfoot>
     </table>
+
+    <button onclick="downloadExpenseCSV()">Download Expense CSV</button>
+    <button onclick="clearExpenses()">Clear All Expenses</button>
   </div>
 
   <script>
-    // --- Labour Records ---
     let records = JSON.parse(localStorage.getItem("records")) || [];
-    function saveRecords() { localStorage.setItem("records", JSON.stringify(records)); }
+    let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
 
+    function saveRecords() {
+      localStorage.setItem("records", JSON.stringify(records));
+    }
+    function saveExpenses() {
+      localStorage.setItem("expenses", JSON.stringify(expenses));
+    }
+
+    // === LABOUR FUNCTIONS ===
     function addRecord() {
       const date = document.getElementById("date").value || new Date().toISOString().split("T")[0];
       const wage = parseInt(document.getElementById("wage").value) || 0;
       const count = parseInt(document.getElementById("count").value) || 0;
       const total = wage * count;
+
       records.push({ date, count, wage, total });
       saveRecords();
       renderLog();
-      document.getElementById("count").value = 1;
-      document.getElementById("wage").value = 900;
     }
 
     function deleteRecord(index) {
-      if (confirm("Delete this labour entry?")) {
+      if (confirm("Are you sure you want to delete this entry?")) {
         records.splice(index, 1);
         saveRecords();
         renderLog();
       }
+    }
+
+    function editRecord(index) {
+      const r = records[index];
+      const body = document.getElementById("logBody");
+      const row = body.rows[index];
+      row.innerHTML = `
+        <td><input type="date" value="${r.date}" id="editDate${index}"></td>
+        <td><input type="number" value="${r.count}" id="editCount${index}"></td>
+        <td><input type="number" value="${r.wage}" id="editWage${index}"></td>
+        <td>${r.total}</td>
+        <td>
+          <button onclick="saveEdit(${index})">Save</button>
+          <button onclick="renderLog()">Cancel</button>
+        </td>`;
+    }
+
+    function saveEdit(index) {
+      const date = document.getElementById(`editDate${index}`).value;
+      const count = parseInt(document.getElementById(`editCount${index}`).value) || 0;
+      const wage = parseInt(document.getElementById(`editWage${index}`).value) || 0;
+      const total = wage * count;
+      records[index] = { date, count, wage, total };
+      saveRecords();
+      renderLog();
     }
 
     function renderLog() {
@@ -132,36 +166,64 @@
       const grandTotalCell = document.getElementById("grandTotal");
       body.innerHTML = "";
       let grandTotal = 0;
+
       records.forEach((r, index) => {
-        body.innerHTML += `<tr>
+        const row = `<tr>
           <td>${r.date}</td>
           <td>${r.count}</td>
           <td>${r.wage}</td>
           <td>${r.total}</td>
-          <td><button class="delete-btn" onclick="deleteRecord(${index})">Delete</button></td>
+          <td>
+            <button class="edit-btn" onclick="editRecord(${index})">Edit</button>
+            <button class="delete-btn" onclick="deleteRecord(${index})">Delete</button>
+          </td>
         </tr>`;
+        body.innerHTML += row;
         grandTotal += r.total;
       });
+
       grandTotalCell.textContent = grandTotal;
     }
 
-    // --- Expense Records ---
-    let expenses = JSON.parse(localStorage.getItem("expenses")) || [];
-    function saveExpenses() { localStorage.setItem("expenses", JSON.stringify(expenses)); }
+    function downloadCSV() {
+      let csv = "Date,Workers,Wage (₹),Total Charge (₹)\n";
+      let grandTotal = 0;
+      records.forEach(r => {
+        csv += `${r.date},${r.count},${r.wage},${r.total}\n`;
+        grandTotal += r.total;
+      });
+      csv += `,,,Grand Total,${grandTotal}\n`;
 
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "labour_logs.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    function clearData() {
+      if (confirm("Are you sure you want to delete all records?")) {
+        records = [];
+        saveRecords();
+        renderLog();
+      }
+    }
+
+    // === EXPENSE FUNCTIONS ===
     function addExpense() {
       const date = document.getElementById("expenseDate").value || new Date().toISOString().split("T")[0];
-      const item = document.getElementById("expenseItem").value || "Misc";
+      const item = document.getElementById("expenseItem").value || "N/A";
       const amount = parseInt(document.getElementById("expenseAmount").value) || 0;
+
       expenses.push({ date, item, amount });
       saveExpenses();
       renderExpenses();
-      document.getElementById("expenseItem").value = "";
-      document.getElementById("expenseAmount").value = "";
     }
 
     function deleteExpense(index) {
-      if (confirm("Delete this expense?")) {
+      if (confirm("Are you sure you want to delete this expense?")) {
         expenses.splice(index, 1);
         saveExpenses();
         renderExpenses();
@@ -169,23 +231,23 @@
     }
 
     function editExpense(index) {
-      const row = document.getElementById("expense-row-" + index);
       const e = expenses[index];
+      const body = document.getElementById("expenseBody");
+      const row = body.rows[index];
       row.innerHTML = `
-        <td><input type="date" id="edit-exp-date-${index}" value="${e.date}"></td>
-        <td><input type="text" id="edit-exp-item-${index}" value="${e.item}"></td>
-        <td><input type="number" id="edit-exp-amount-${index}" value="${e.amount}"></td>
+        <td><input type="date" value="${e.date}" id="editExpenseDate${index}"></td>
+        <td><input type="text" value="${e.item}" id="editExpenseItem${index}"></td>
+        <td><input type="number" value="${e.amount}" id="editExpenseAmount${index}"></td>
         <td>
-          <button class="edit-btn" onclick="saveExpenseEdit(${index})">Save</button>
-          <button class="delete-btn" onclick="renderExpenses()">Cancel</button>
-        </td>
-      `;
+          <button onclick="saveExpenseEdit(${index})">Save</button>
+          <button onclick="renderExpenses()">Cancel</button>
+        </td>`;
     }
 
     function saveExpenseEdit(index) {
-      const date = document.getElementById("edit-exp-date-" + index).value;
-      const item = document.getElementById("edit-exp-item-" + index).value;
-      const amount = parseInt(document.getElementById("edit-exp-amount-" + index).value) || 0;
+      const date = document.getElementById(`editExpenseDate${index}`).value;
+      const item = document.getElementById(`editExpenseItem${index}`).value;
+      const amount = parseInt(document.getElementById(`editExpenseAmount${index}`).value) || 0;
       expenses[index] = { date, item, amount };
       saveExpenses();
       renderExpenses();
@@ -196,8 +258,9 @@
       const expenseTotalCell = document.getElementById("expenseTotal");
       body.innerHTML = "";
       let total = 0;
+
       expenses.forEach((e, index) => {
-        body.innerHTML += `<tr id="expense-row-${index}">
+        const row = `<tr>
           <td>${e.date}</td>
           <td>${e.item}</td>
           <td>${e.amount}</td>
@@ -206,30 +269,58 @@
             <button class="delete-btn" onclick="deleteExpense(${index})">Delete</button>
           </td>
         </tr>`;
+        body.innerHTML += row;
         total += e.amount;
       });
       expenseTotalCell.textContent = total;
     }
 
-    // --- Tabs ---
-    function switchTab(tab) {
-      document.getElementById("labourTab").classList.remove("active");
-      document.getElementById("expenseTab").classList.remove("active");
-      document.getElementById("labourTabBtn").classList.remove("active");
-      document.getElementById("expenseTabBtn").classList.remove("active");
+    function downloadExpenseCSV() {
+      let csv = "Date,Item,Amount (₹)\n";
+      let total = 0;
+      expenses.forEach(e => {
+        csv += `${e.date},${e.item},${e.amount}\n`;
+        total += e.amount;
+      });
+      csv += `,,Total Expense,${total}\n`;
 
-      if (tab === "labour") {
-        document.getElementById("labourTab").classList.add("active");
-        document.getElementById("labourTabBtn").classList.add("active");
-      } else {
-        document.getElementById("expenseTab").classList.add("active");
-        document.getElementById("expenseTabBtn").classList.add("active");
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "expense_logs.csv";
+      a.click();
+      window.URL.revokeObjectURL(url);
+    }
+
+    function clearExpenses() {
+      if (confirm("Are you sure you want to delete all expenses?")) {
+        expenses = [];
+        saveExpenses();
+        renderExpenses();
       }
     }
 
-    // Initial render
+    // === Tabs ===
+    function switchTab(tab) {
+      document.getElementById("labourTab").classList.remove("active");
+      document.getElementById("expenseTab").classList.remove("active");
+      document.getElementById("labourTabBtn").style.background = "#007bff";
+      document.getElementById("expenseTabBtn").style.background = "#007bff";
+
+      if (tab === "labour") {
+        document.getElementById("labourTab").classList.add("active");
+        document.getElementById("labourTabBtn").style.background = "#0056b3";
+      } else {
+        document.getElementById("expenseTab").classList.add("active");
+        document.getElementById("expenseTabBtn").style.background = "#0056b3";
+      }
+    }
+
+    // === Initial render ===
     renderLog();
     renderExpenses();
+    switchTab("labour");
   </script>
 </body>
 </html>
